@@ -3,39 +3,65 @@
 
 # Temp File Share
 
-**Upload files and folders from your terminal and get a download link.**
+**Upload files and folders from your terminal and get a shareable download link.**
 
 [![Python](https://img.shields.io/badge/python-3.9%2B-3776AB?logo=python&logoColor=white&style=flat-square)](https://www.python.org/)
-[![Docker](https://img.shields.io/badge/Docker-20.10%2B-2496ED?logo=docker&logoColor=white&style=flat-square)](https://www.docker.com/)
-[![License: AGPL](https://img.shields.io/badge/license-AGPL--3.0-blue.svg?style=flat-square)](http://www.gnu.org/licenses/agpl-3.0)
-[![Built with](https://img.shields.io/badge/zero-dependencies-brightgreen?style=flat-square)](backend/requirements.txt)
+[![Docker](https://img.shields.io/badge/docker-20.10%2B-2496ED?logo=docker&logoColor=white&style=flat-square)](https://www.docker.com/)
+[![License](https://img.shields.io/badge/license-AGPL--3.0-blue.svg?style=flat-square)](LICENSE)
+[![Zero dependencies](https://img.shields.io/badge/zero-dependencies-brightgreen?style=flat-square)](backend/requirements.txt)
 
-[Overview](#overview) • [Quick Start](#quick-start) • [Usage](#usage) • [API](#api) • [Configuration](#configuration) • [Deployment](#deployment)
+[Features](#features) • [Quick Start](#quick-start) • [Usage](#usage) • [API](#api) • [Configuration](#configuration) • [Deployment](#deployment)
+
+<br>
+
+[![UI screenshot](images/ui.png)](images/ui.png)
 
 </div>
 
-## Overview
+A lightweight file sharing server with zero external dependencies. Upload files from your terminal, get a download link, and the files expire automatically. Folders and multiple files are zipped on the client side before upload.
 
-Temp File Share is a lightweight, zero-dependency file sharing server. Upload files from your terminal (or the web UI), get a shareable download link, and the files expire automatically. Folders and multiple files are zipped on the client side before upload.
+> [!TIP]
+> Try it in one command: `curl -s https://dl.itsnooblk.com/upload.sh | bash -s -- <file>`
 
-<p align="center">
-  <img src="./images/ui.png" alt="Temp File Share UI" width="600" style="border-radius: 8px;">
-</p>
+---
 
-### Features
+## Features
 
-- **One-command upload** — Upload files and folders with a single bash command
-- **Auto-zip** — Folders and multiple files are automatically compressed into a tarball before upload
-- **Automatic expiry** — Old files are cleaned up on a background schedule
-- **Per-IP limits** — Storage quotas and rate limiting prevent abuse
-- **Geo-location** — IP addresses are resolved to country flags in the web UI
-- **Web UI** — Browse recent uploads with expiry times
-- **Proxy-aware** — Respects `X-Real-IP` and `X-Forwarded-For` headers behind a reverse proxy
-- **Zero dependencies** — Pure Python stdlib, no requirements to install
+**Simple sharing workflow**
+
+- Upload files, folders, or multiple items at once with a single command
+- Folders are automatically compressed into a tarball before upload
+- Each upload returns a download link immediately
+
+**Built-in abuse protection**
+
+- Per-IP storage quotas prevent excessive usage
+- Configurable rate limiting between uploads
+- Automatic expiry and cleanup of old files on a background schedule
+
+**Observability**
+
+- Web UI shows storage usage, recent uploads, and expiry times
+- Country flags are resolved from IP addresses via geo-lookup
+- Server logs include upload, download, and clear events
+
+**Operations friendly**
+
+- Proxy-aware: respects `X-Real-IP` and `X-Forwarded-For` headers
+- No build step, no package manager, no database setup
+- Runs on any system with Python 3.9+
+
+---
 
 ## Quick Start
 
-### Run with Docker
+### One-liner upload
+
+```bash
+curl -s https://dl.itsnooblk.com/upload.sh | bash -s -- ./document.pdf
+```
+
+### Run the server with Docker
 
 ```bash
 docker run -d \
@@ -46,7 +72,7 @@ docker run -d \
   ghcr.io/nooblk-98/temp-file-share:latest
 ```
 
-### Run from source
+### Run the server from source
 
 ```bash
 git clone https://github.com/nooblk-98/temp-file-share.git
@@ -56,26 +82,28 @@ python3 backend.py
 ```
 
 > [!TIP]
-> Override config settings by editing `backend/config.json` before starting the server.
+> Edit `backend/config.json` before starting the server to set your domain, storage limits, and expiry duration.
+
+---
 
 ## Usage
 
 ### Upload files
 
-The `upload.sh` script handles single files, multiple files, and directories:
+The `upload.sh` script detects whether you're uploading a single file, multiple files, or a directory:
 
 ```bash
-# Upload a single file
+# Single file
 ./upload.sh document.pdf
 
-# Upload multiple files and folders
+# Multiple items
 ./upload.sh photos/ documents/ notes.txt
 
-# Upload a folder (auto-zipped)
+# Directory (auto-zipped)
 ./upload.sh my-project/
 ```
 
-Sample output:
+**Sample output:**
 
 ```
 Single file detected, uploading directly: document.pdf
@@ -97,7 +125,7 @@ Remove all files uploaded from your IP address:
 ./upload.sh --clear
 ```
 
-### Remote server
+### Use a remote server
 
 Set the `BACKEND_URL` environment variable to point to a remote instance:
 
@@ -107,15 +135,19 @@ export BACKEND_URL=https://dl.itsnooblk.com
 ```
 
 > [!NOTE]
-> The bash script (`upload.sh`) is also served directly by the server at `GET /upload.sh`, making it easy to distribute.
+> The upload script is served directly by the server at `GET /upload.sh`, so clients can fetch it without cloning the repo.
+
+---
 
 ## API
 
-The server exposes a simple HTTP API:
+### Upload a file
 
-### `POST /upload`
+```bash
+POST /upload
+```
 
-Upload a file. Accepts `multipart/form-data` (with a `file` field) or raw binary body.
+Accepts `multipart/form-data` (with a `file` field) or raw binary body.
 
 ```bash
 # Multipart upload
@@ -126,35 +158,45 @@ curl -X POST -H "Content-Type: application/octet-stream" \
   --data-binary @photo.jpg http://localhost:54000/upload
 ```
 
-**Response:** Plain text with download URL, metadata, and remaining quotas.
+**Response:** Plain text with the download URL, your IP, file size, expiry time, and remaining quotas.
 
-### `GET /download/<filename>`
+### Download a file
 
-Download a previously uploaded file.
+```bash
+GET /download/<filename>
+```
 
 ```bash
 curl -O http://localhost:54000/download/<filename>
 ```
 
-### `POST /clear`
+### Clear your files
 
-Delete all files uploaded from your IP address.
+```bash
+POST /clear
+```
+
+Deletes all files uploaded from your IP address.
 
 ```bash
 curl -X POST http://localhost:54000/clear
 ```
 
-### `GET /` or `GET /index.html`
+### Web UI
 
-Serves the main web UI showing storage usage and recent uploads.
+| Route | Description |
+|---|---|
+| `GET /` | Main dashboard — storage usage, quotas, recent uploads |
+| `GET /uploads` | Upload listing — file names, sizes, timestamps, country flags |
+| `GET /upload.sh` | Download the client upload script |
+| `GET /robots.txt` | Robots exclusion rules |
+| `GET /sitemap.xml` | XML sitemap |
 
-### `GET /uploads` or `GET /uploads.html`
-
-Serves the upload listing page with file details, expiry times, and country flags.
+---
 
 ## Configuration
 
-Settings are defined in `backend/config.json`:
+All settings are in `backend/config.json`:
 
 ```json
 {
@@ -178,13 +220,13 @@ Settings are defined in `backend/config.json`:
 | `PUBLIC_BASE_URL` | `""` | Public-facing base URL for download links |
 | `FILES_DB` | `data/files_db.json` | Path to the file metadata database |
 | `RATE_LIMIT_SECONDS` | `0` | Cooldown between uploads (0 = disabled) |
-| `CLEANUP_INTERVAL_SECONDS` | `300` | Expired file cleanup interval |
+| `CLEANUP_INTERVAL_SECONDS` | `300` | Expired file cleanup interval in seconds |
+
+---
 
 ## Deployment
 
 ### Docker Compose
-
-A `docker-compose.yaml` is included for production deployments:
 
 ```yaml
 services:
@@ -198,12 +240,10 @@ services:
 ```
 
 ```bash
-docker-compose up -d
+docker compose up -d
 ```
 
-### Reverse proxy
-
-The server respects `X-Real-IP` and `X-Forwarded-For` headers. When behind nginx:
+### Reverse proxy (nginx)
 
 ```nginx
 server {
@@ -221,9 +261,11 @@ server {
 ```
 
 > [!IMPORTANT]
-> Set `PUBLIC_BASE_URL` in config to match your public domain so download links resolve correctly.
+> Set `PUBLIC_BASE_URL` in `config.json` to your public domain so download links resolve correctly. Without this, links will use whatever `Host` header the client sends.
 
-## Project Structure
+---
+
+## Project structure
 
 ```
 ├── backend/
@@ -231,11 +273,12 @@ server {
 │   ├── backend.py          # Entry point
 │   ├── config.json         # Server configuration
 │   ├── Dockerfile          # Container image
+│   ├── pyproject.toml      # Project metadata
+│   ├── requirements.txt    # Zero dependencies
 │   ├── templates/          # HTML templates
 │   ├── static/             # CSS and JS assets
-│   └── scripts/
-│       └── upload.sh       # Client upload script
+│   └── scripts/            # Client upload script
 ├── docker-compose.yaml     # Production deployment
 ├── images/                 # Logo and screenshots
-└── upload.sh               # Client upload script (root convenience copy)
+└── upload.sh               # Client upload script
 ```
