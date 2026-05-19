@@ -2,7 +2,7 @@ FROM python:3.9-slim
 
 WORKDIR /app
 
-COPY backend.py app.py config.json .
+COPY backend.py app.py config.py _types.py filestore.py georesolver.py ratelimiter.py config.json .
 COPY templates ./templates
 COPY static ./static
 COPY scripts ./scripts
