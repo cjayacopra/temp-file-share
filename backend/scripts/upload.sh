@@ -1,6 +1,6 @@
 #!/bin/bash
 
-BACKEND_URL=${BACKEND_URL:-https://dl.itsnooblk.com}
+BACKEND_URL=${BACKEND_URL:-https://dl.godchryz.dev}
 
 if [ "$1" = "--clear" ] || [ "$1" = "-c" ]; then
     curl -s -X POST "$BACKEND_URL/clear"
